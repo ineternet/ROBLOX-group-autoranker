@@ -1,16 +1,16 @@
+// Author: Quenty
+// Intent: Helps auto-rank members
+
 var objectAssign = require('object-assign');
 var express = require('express');
 var request = require('request').defaults({jar: true});
 var fs = require("fs");
 
-// Author: Quenty
-// Intent: Helps auto-rank members
-
 var app = express();
 
 function isInt(value) {
-  return !isNaN(value) && 
-         parseInt(Number(value)) == value && 
+  return !isNaN(value) &&
+         parseInt(Number(value)) == value &&
          !isNaN(parseInt(value, 10));
 }
 
@@ -20,14 +20,14 @@ function Group(id) {
     if (!isInt(id)) {
         throw 'id not an int';
     }
-    
+
     this.id = id;
 }
 
 // Retrieves the roleset for the group
 Group.prototype.getRoleSet = function(callback) {
     var self = this;
-    
+
     if (self.roleSet) {
         callback(null, roleSet);
     } else {
@@ -50,22 +50,22 @@ Group.prototype.getRoleSetByRank = function(rankNumber, callback) {
     if (!isInt(rankNumber)) {
         throw 'rankNumber not an int';
     }
-    
+
     var self = this;
-    
+
     self.getRoleSet(function(err, roleSet) {
         if (err) {
             callback(err, null);
         } else {
             for (var i=0; i<roleSet.length; i++) {
                 var role = roleSet[i];
-                
+
                 if (role.Rank == rankNumber) {
                     callback(null, role);
                     return;
                 }
             }
-            
+
             callback(new Error('No role with rankNumber'), null);
             return;
         }
@@ -80,19 +80,19 @@ var botMixin = {
             callback(new Error("Invalid group"), false);
             return;
         }
-        
+
         if (!user || !isInt(user.id)) {
             callback(new Error("Invalid user"), false);
             return;
         }
-        
+
         if (!role || !isInt(role.Id) ) {
             callback(new Error("Invalid role"), false);
             return;
         }
-        
+
         var self = this;
-        
+
         self.getXSRFToken(function(err, csrfToken) {
             if (err) {
                 callback(err, null);
@@ -122,7 +122,7 @@ var botMixin = {
     },
     getXSRFToken: function(callback) {
         var self = this;
-        
+
         if (self.XSRFToken) {
             callback(null, self.XSRFToken);
         } else {
@@ -135,15 +135,15 @@ var botMixin = {
                     var index = body.indexOf('setToken(\'');
                     var end = body.indexOf('\')', index);
                     var token = body.slice(index + 10, end);
-                    
+
                     self.XSRFToken = token;
-                    
+
                     callback(null, token);
                 }
             });
         }
     },
-    
+
 };
 
 function User(id) {
@@ -162,18 +162,18 @@ User.authenticate = function(username, password, callback) {
   request.post({
     url: 'https://api.roblox.com/v2/login',
     formData: {
-      "username":username,
-      "password":password
+      "username": username,
+      "password": password
     }
-  }, function (err, res, body) {
+  }, function(err, res, body) {
         if (err) {
             callback(err, false);
         } else if (res.statusCode != 200) {
-            callback(new Error('Could not login. Response \'' + res.statusCode + '\' from ROBLOX'), false);
+            callback(new Error('Could not login. Response \'' + res.statusCode + '\' from ROBLOX. Error: ' + res.body), false);
         } else {
             var data = JSON.parse(body);
             var user = new User(data.userId);
-            
+
             objectAssign(user, botMixin);
             callback(null, user);
         }
@@ -183,7 +183,7 @@ User.authenticate = function(username, password, callback) {
 // Gets the user's groups
 User.prototype.getGroups = function(callback) {
     var self = this;
-    
+
     if (self.groups) {
         callback(null, groups);
     } else {
@@ -206,19 +206,19 @@ User.prototype.inGroup = function(groupId, callback) {
     if (!isInt(groupId)) {
         callback(new Error('id not an int'), null);
     }
-    
+
     var self = this;
-    
+
     self.getGroups(function(err, groups) {
         for (var i=0; i<groups.length; i++) {
             var group = groups[i];
-            
+
             if (group.Id == groupId) {
                 callback(null, group);
                 return;
             }
         }
-        
+
         callback(null, false);
         return;
     });
@@ -228,14 +228,14 @@ User.prototype.inGroup = function(groupId, callback) {
 // Parameters
 app.param('groupId', function(req, res, next, groupIdString) {
     var groupId = parseInt(groupIdString, 10);
-    
+
     req.Group = new Group(groupId);
     next();
 });
 
 app.param('roleRankId', function(req, res, next, rankNumberString) {
     var rankNumber = parseInt(rankNumberString, 10);
-    
+
     req.Group.getRoleSetByRank(rankNumber, function(err, roleRank) {
         if (err) {
             next(err);
@@ -248,7 +248,7 @@ app.param('roleRankId', function(req, res, next, rankNumberString) {
 
 app.param('userId', function(req, res, next, userIdString) {
     var userId = parseInt(userIdString, 10);
-    
+
     req.User = new User(userId);
     next();
 });
@@ -257,12 +257,12 @@ app.param('userId', function(req, res, next, userIdString) {
 // Routes
 var BOT_DATA = JSON.parse(fs.readFileSync("auth.json"));
 
-app.get('/group/:groupId', function (req, res) {
+app.get('/group/:groupId', function(req, res) {
     res.json(req.Group);
 });
 
 // Returns the roleset for the group
-app.get('/group/:groupId/roleset', function (req, res) {
+app.get('/group/:groupId/roleset', function(req, res) {
     req.Group.getRoleSet(function(err, roleset) {
         if (err) {
             res.status(500).json({ error: err.message });
@@ -273,12 +273,12 @@ app.get('/group/:groupId/roleset', function (req, res) {
 });
 
 // Returns specific data on the role rank
-app.get('/group/:groupId/rank/:roleRankId', function (req, res) {
+app.get('/group/:groupId/rank/:roleRankId', function(req, res) {
     res.json(req.roleRank);
 });
 
-// Returns specific data on the user for that group, including rank if they're in the group. 
-app.get('/group/:groupId/user/:userId/', function (req, res) {
+// Returns specific data on the user for that group, including rank if they're in the group.
+app.get('/group/:groupId/user/:userId/', function(req, res) {
     req.User.inGroup(req.Group.id, function(err, isInGroup) {
         if (err) {
             res.status(500).json({ error: err.message });
@@ -292,7 +292,7 @@ app.get('/group/:groupId/user/:userId/', function (req, res) {
 });
 
 // Changes a users role
-app.get('/group/:groupId/setRank/:userId/:roleRankId', function (req, res) {
+app.get('/group/:groupId/setRank/:userId/:roleRankId', function(req, res) {
     req.User.inGroup(req.Group.id, function(err, isInGroup) {
         if (err) {
             res.status(500).json({ error: err.message });
@@ -320,7 +320,7 @@ app.get('/group/:groupId/setRank/:userId/:roleRankId', function (req, res) {
 
 
 // Gets a user's group
-app.get('/user/:userId/groups/', function (req, res) {
+app.get('/user/:userId/groups/', function(req, res) {
     req.User.getGroups(function(err, groups) {
         if (err) {
             res.status(500).json({ error: err.message });
